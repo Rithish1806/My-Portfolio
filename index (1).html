@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rithish M — Data Analyst &amp; Web Developer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="grain"></div>
+<div class="scanline"></div>
+
+<!-- CURSOR DOT -->
+<div class="cursor-dot" id="cursorDot"></div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="#top" class="nav-logo">rithish<span class="cursor-blink">_</span></a>
+    <div class="nav-links">
+      <a href="#about"><span class="nav-num">01</span>about</a>
+      <a href="#stack"><span class="nav-num">02</span>stack</a>
+      <a href="#work"><span class="nav-num">03</span>work</a>
+      <a href="#stats"><span class="nav-num">04</span>stats</a>
+      <a href="#contact"><span class="nav-num">05</span>contact</a>
+    </div>
+    <div class="nav-status"><span class="dot-live"></span>open to work</div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero" id="top">
+  <div class="hero-grid"></div>
+  <div class="hero-3d-layer" id="heroLayer">
+    <div class="float-card card-a" data-depth="0.6">SELECT * FROM insights;</div>
+    <div class="float-card card-b" data-depth="0.9">df.groupby('region').sum()</div>
+    <div class="float-card card-c" data-depth="0.4">git commit -m "ship it"</div>
+    <div class="float-card card-d" data-depth="1.1">accuracy: 0.94</div>
+  </div>
+
+  <div class="hero-content">
+    <div class="terminal-boot" id="terminalBoot">
+      <p class="boot-line"><span class="prompt">rithish@portfolio</span>:<span class="path">~</span>$ <span class="typed" id="typedLine"></span><span class="cursor-blink">_</span></p>
+    </div>
+
+    <h1 class="hero-title">
+      <span class="hero-title-line">RITHISH M</span>
+    </h1>
+    <p class="hero-subtitle">
+      AI &amp; Data Science undergrad — <span class="accent">3rd year</span> · Bannari Amman Institute of Technology
+    </p>
+    <p class="hero-tagline">
+      Turning raw data into decisions, and ideas into shipped websites.<br class="br-desktop">
+      Aspiring <span class="accent-blue">Data Analyst</span> · Web Development enthusiast.
+    </p>
+
+    <div class="hero-cta">
+      <a href="#work" class="btn btn-primary">view work <span class="arrow">→</span></a>
+      <a href="#contact" class="btn btn-ghost">get in touch</a>
+    </div>
+
+    <div class="hero-links">
+      <a href="https://github.com/Rithish1827" target="_blank" rel="noopener">github</a>
+      <span class="sep">/</span>
+      <a href="https://www.linkedin.com/in/rithishm2006/" target="_blank" rel="noopener">linkedin</a>
+      <span class="sep">/</span>
+      <a href="https://leetcode.com/u/Rithish_M/" target="_blank" rel="noopener">leetcode</a>
+      <span class="sep">/</span>
+      <a href="https://www.hackerrank.com/profile/rithishm2006" target="_blank" rel="noopener">hackerrank</a>
+    </div>
+  </div>
+
+  <div class="scroll-cue">
+    <span>scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</header>
+
+<!-- ABOUT -->
+<section class="section about" id="about">
+  <div class="section-head">
+    <span class="section-num">01</span>
+    <h2 class="section-title">about</h2>
+  </div>
+
+  <div class="about-grid">
+    <div class="about-text">
+      <p class="lead">
+        I'm a 3rd-year <strong>B.Tech AI &amp; Data Science</strong> student at
+        <strong> Bannari Amman Institute of Technology</strong>, Sathyamangalam —
+        most comfortable somewhere between a spreadsheet and a stylesheet.
+      </p>
+      <p>
+        I like problems with a correct answer. That pulled me toward data —
+        cleaning it, modelling it, finding the line in the noise — and toward
+        building software where the logic actually has to run. I completed my
+        HSC in 2024 with <strong>88%</strong>, and since then I've been
+        stacking up Python, Java, C, and an unreasonable number of solved
+        problems on LeetCode and HackerRank.
+      </p>
+      <p>
+        Outside coursework, I build for people who need it: a dashboard for
+        my project group, an e-commerce storefront for a startup, a site for
+        my dad's workshop, and a learning platform for UPSC aspirants.
+        Four very different audiences, same habit — ship something that works.
+      </p>
+    </div>
+
+    <div class="about-card-stack" id="aboutCards">
+      <div class="info-card" data-depth="0.3">
+        <span class="info-label">education</span>
+        <span class="info-value">B.Tech, AI &amp; Data Science</span>
+        <span class="info-sub">Bannari Amman Institute of Technology · 3rd Year</span>
+      </div>
+      <div class="info-card" data-depth="0.5">
+        <span class="info-label">hsc · 2024</span>
+        <span class="info-value">88%</span>
+        <span class="info-sub">Higher Secondary Certificate</span>
+      </div>
+      <div class="info-card" data-depth="0.7">
+        <span class="info-label">trajectory</span>
+        <span class="info-value">Data Analyst (aspiring)</span>
+        <span class="info-sub">+ Web Development enthusiast</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STACK -->
+<section class="section stack-section" id="stack">
+  <div class="section-head">
+    <span class="section-num">02</span>
+    <h2 class="section-title">stack</h2>
+  </div>
+
+  <div class="stack-columns">
+    <div class="stack-col">
+      <h3 class="stack-col-title">languages</h3>
+      <ul class="skill-bars">
+        <li><span class="skill-name">Python</span><div class="bar"><div class="bar-fill" style="--level:92%"></div></div></li>
+        <li><span class="skill-name">Java</span><div class="bar"><div class="bar-fill" style="--level:80%"></div></div></li>
+        <li><span class="skill-name">C</span><div class="bar"><div class="bar-fill" style="--level:75%"></div></div></li>
+        <li><span class="skill-name">SQL</span><div class="bar"><div class="bar-fill" style="--level:78%"></div></div></li>
+      </ul>
+    </div>
+
+    <div class="stack-col">
+      <h3 class="stack-col-title">data &amp; analysis</h3>
+      <ul class="chip-list">
+        <li>Pandas</li>
+        <li>NumPy</li>
+        <li>Data Cleaning</li>
+        <li>EDA</li>
+        <li>Visualization</li>
+        <li>Excel</li>
+      </ul>
+    </div>
+
+    <div class="stack-col">
+      <h3 class="stack-col-title">web development</h3>
+      <ul class="chip-list">
+        <li>HTML</li>
+        <li>CSS</li>
+        <li>JavaScript</li>
+        <li>Responsive Design</li>
+        <li>Git / GitHub</li>
+      </ul>
+    </div>
+
+    <div class="stack-col">
+      <h3 class="stack-col-title">practice</h3>
+      <div class="practice-stats">
+        <div class="practice-stat">
+          <span class="practice-num" data-target="270">0</span><span class="practice-plus">+</span>
+          <span class="practice-label">LeetCode problems solved</span>
+        </div>
+        <div class="practice-stars">
+          <span class="practice-label">HackerRank</span>
+          <div class="hr-row"><span>Python</span><span class="stars">★★★★</span></div>
+          <div class="hr-row"><span>Java</span><span class="stars">★★★</span></div>
+          <div class="hr-row"><span>C</span><span class="stars">★★★</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WORK -->
+<section class="section work" id="work">
+  <div class="section-head">
+    <span class="section-num">03</span>
+    <h2 class="section-title">work</h2>
+  </div>
+
+  <div class="project-stack" id="projectStack">
+
+    <article class="project-card" data-depth="0.2">
+      <div class="project-meta">
+        <span class="project-tag">dashboard</span>
+        <span class="project-index">file_01</span>
+      </div>
+      <h3 class="project-title">Group Project Dashboard</h3>
+      <p class="project-desc">
+        A shared dashboard built for my project group to track and visualize
+        our data in one place — turning scattered numbers into something the
+        whole team could actually read at a glance.
+      </p>
+      <div class="project-tags">
+        <span>Data Visualization</span>
+        <span>Python</span>
+        <span>Team Tool</span>
+      </div>
+      <a href="https://fight-club-dashboard.onrender.com/" target="_blank" rel="noopener" class="project-link">visit site <span class="arrow">→</span></a>
+    </article>
+
+    <article class="project-card" data-depth="0.45">
+      <div class="project-meta">
+        <span class="project-tag">e-commerce</span>
+        <span class="project-index">file_02</span>
+      </div>
+      <h3 class="project-title">Startup E-Commerce Site</h3>
+      <p class="project-desc">
+        A storefront built for a startup — product listings, a clean buying
+        flow, and a layout designed to get out of the customer's way.
+      </p>
+      <div class="project-tags">
+        <span>HTML/CSS/JS</span>
+        <span>UI/UX</span>
+        <span>Client Work</span>
+      </div>
+      <a href="https://nirvi-jewels.onrender.com" target="_blank" rel="noopener" class="project-link">visit site <span class="arrow">→</span></a>
+    </article>
+
+    <article class="project-card" data-depth="0.7">
+      <div class="project-meta">
+        <span class="project-tag">small business</span>
+        <span class="project-index">file_03</span>
+      </div>
+      <h3 class="project-title">Workshop Website</h3>
+      <p class="project-desc">
+        A website built for my dad's workshop — giving a real, hands-on
+        business a presence online, with services and contact info anyone
+        can find in seconds.
+      </p>
+      <div class="project-tags">
+        <span>Responsive</span>
+        <span>Local Business</span>
+        <span>Frontend</span>
+      </div>
+      <a href="https://mani-two-wheeler-works.onrender.com/" target="_blank" rel="noopener" class="project-link">visit site <span class="arrow">→</span></a>
+    </article>
+
+    <article class="project-card" data-depth="0.95">
+      <div class="project-meta">
+        <span class="project-tag">edtech</span>
+        <span class="project-index">file_04</span>
+      </div>
+      <h3 class="project-title">UPSC Learning Platform</h3>
+      <p class="project-desc">
+        A site built for UPSC exam aspirants to study — organizing material
+        into a structure that's easier to return to every day, not just
+        browse once.
+      </p>
+      <div class="project-tags">
+        <span>Education</span>
+        <span>Content Structure</span>
+        <span>Frontend</span>
+      </div>
+      <a href="https://upsc-quiz-brwm.onrender.com/" target="_blank" rel="noopener" class="project-link">visit site <span class="arrow">→</span></a>
+    </article>
+
+  </div>
+</section>
+
+<!-- STATS / PHILOSOPHY -->
+<section class="section stats-section" id="stats">
+  <div class="section-head">
+    <span class="section-num">04</span>
+    <h2 class="section-title">how I work</h2>
+  </div>
+
+  <div class="philosophy-grid">
+    <div class="philosophy-card">
+      <span class="philosophy-mark">if</span>
+      <p>I trust logic over guesses — every decision should trace back to something measurable.</p>
+    </div>
+    <div class="philosophy-card">
+      <span class="philosophy-mark">for</span>
+      <p>Practice compounds. 270+ LeetCode problems isn't a flex, it's a habit.</p>
+    </div>
+    <div class="philosophy-card">
+      <span class="philosophy-mark">return</span>
+      <p>Ship something real. Four live projects, four real audiences, zero "someday" ideas.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="section contact" id="contact">
+  <div class="contact-inner">
+    <span class="section-num">05</span>
+    <h2 class="contact-title">let's build<br>something.</h2>
+    <p class="contact-sub">Open to internships, data analyst roles, and web dev collaborations.</p>
+
+    <div class="contact-links">
+      <a href="mailto:rithishm2006@gmail.com" class="contact-link-main">rithishm2006@gmail.com</a>
+    </div>
+
+    <div class="contact-grid">
+      <a href="https://github.com/Rithish1827" target="_blank" rel="noopener" class="contact-tile">
+        <span class="tile-label">github</span>
+        <span class="tile-value">Rithish1827</span>
+      </a>
+      <a href="https://www.linkedin.com/in/rithishm2006/" target="_blank" rel="noopener" class="contact-tile">
+        <span class="tile-label">linkedin</span>
+        <span class="tile-value">rithishm2006</span>
+      </a>
+      <a href="https://leetcode.com/u/Rithish_M/" target="_blank" rel="noopener" class="contact-tile">
+        <span class="tile-label">leetcode</span>
+        <span class="tile-value">Rithish_M</span>
+      </a>
+      <a href="https://www.hackerrank.com/profile/rithishm2006" target="_blank" rel="noopener" class="contact-tile">
+        <span class="tile-label">hackerrank</span>
+        <span class="tile-value">rithishm2006</span>
+      </a>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span>© 2026 Rithish M</span>
+    <span>built with intent</span>
+  </footer>
+</section>
+
+<script src="script.js"></script>
+</body>
+</html>
