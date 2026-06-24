@@ -354,9 +354,248 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
     }
   }
 
+  class Meteoroid {
+    constructor() {
+      this.reset();
+      this.active = false;
+      this.spawnTimer = Math.random() * 240 + 30;
+    }
+
+    reset() {
+      this.x = Math.random() * (width * 1.5) - (width * 0.25);
+      this.y = -60;
+      this.length = Math.random() * 60 + 40;
+      this.speed = Math.random() * 9 + 6;
+      this.dx = -this.speed * 0.8;
+      this.dy = this.speed * 0.6;
+      this.size = Math.random() * 1.2 + 0.6;
+      this.color = colors[Math.floor(Math.random() * colors.length)];
+      this.active = true;
+    }
+
+    update(scrollDelta) {
+      if (!this.active) {
+        this.spawnTimer--;
+        if (this.spawnTimer <= 0) {
+          this.reset();
+        }
+        return;
+      }
+
+      this.x += this.dx;
+      this.y += this.dy + scrollDelta * 0.4;
+
+      if (this.x < -100 || this.y > height + 100 || this.x > width + 100) {
+        this.active = false;
+        this.spawnTimer = Math.random() * 300 + 150;
+      }
+    }
+
+    draw() {
+      if (!this.active) return;
+
+      const multiplier = this.length / this.speed;
+      const grad = ctx.createLinearGradient(
+        this.x, this.y,
+        this.x - this.dx * multiplier, this.y - this.dy * multiplier
+      );
+      grad.addColorStop(0, this.color);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+      ctx.beginPath();
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = this.size;
+      ctx.lineCap = 'round';
+      ctx.moveTo(this.x, this.y);
+      ctx.lineTo(this.x - this.dx * multiplier, this.y - this.dy * multiplier);
+      ctx.stroke();
+    }
+  }
+
+  class Planet {
+    constructor(initial = false) {
+      this.active = false;
+      this.spawnTimer = initial ? 0 : Math.random() * 200 + 50;
+      this.radius = Math.random() * 6 + 5; // radius: 5px to 11px
+      this.color = colors[Math.floor(Math.random() * colors.length)];
+      this.opacity = Math.random() * 0.35 + 0.4;
+      
+      this.vx = Math.random() * 0.16 - 0.08;
+      this.vy = Math.random() * 0.06 - 0.03;
+      
+      if (initial) {
+        this.x = Math.random() * width;
+        this.y = Math.random() * height;
+        this.active = true;
+      } else {
+        this.reset();
+      }
+    }
+
+    reset() {
+      if (Math.random() > 0.5) {
+        this.x = width + 50;
+        this.y = Math.random() * height;
+      } else {
+        this.x = Math.random() * width;
+        this.y = -50;
+      }
+      this.radius = Math.random() * 6 + 5;
+      this.color = colors[Math.floor(Math.random() * colors.length)];
+      this.opacity = Math.random() * 0.35 + 0.4;
+      this.vx = Math.random() * 0.16 - 0.08;
+      this.vy = Math.random() * 0.06 - 0.03;
+      this.active = true;
+    }
+
+    update(scrollDelta) {
+      if (!this.active) {
+        this.spawnTimer--;
+        if (this.spawnTimer <= 0) {
+          this.reset();
+        }
+        return;
+      }
+
+      this.x += this.vx;
+      this.y += this.vy + scrollDelta * 0.15;
+
+      if (this.x < -100 || this.x > width + 100 || this.y < -100 || this.y > height + 100) {
+        this.active = false;
+        this.spawnTimer = Math.random() * 250 + 100;
+      }
+    }
+
+    draw() {
+      if (!this.active) return;
+      ctx.save();
+      ctx.globalAlpha = this.opacity;
+      
+      const grad = ctx.createRadialGradient(
+        this.x - this.radius * 0.25, this.y - this.radius * 0.25, this.radius * 0.05,
+        this.x, this.y, this.radius
+      );
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.3, this.color);
+      grad.addColorStop(1, '#000000');
+      
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  class ExplosionParticle {
+    constructor(x, y, vx, vy, color) {
+      this.x = x;
+      this.y = y;
+      this.vx = vx;
+      this.vy = vy;
+      this.color = color;
+      this.size = Math.random() * 2.2 + 1.0;
+      this.alpha = 1.0;
+      this.decay = Math.random() * 0.016 + 0.01;
+      this.life = 70;
+    }
+
+    update(scrollDelta) {
+      this.vy += 0.03; // gravity physics
+      this.vx *= 0.98; // air resistance friction
+      this.vy *= 0.98;
+      this.x += this.vx;
+      this.y += this.vy + scrollDelta * 0.25;
+      this.alpha -= this.decay;
+      this.life--;
+    }
+
+    draw() {
+      if (this.alpha <= 0 || this.life <= 0) return;
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = this.color;
+      ctx.shadowBlur = 4;
+      ctx.shadowColor = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  class ExplosionRing {
+    constructor(x, y, startRadius, color) {
+      this.x = x;
+      this.y = y;
+      this.radius = startRadius;
+      this.maxRadius = startRadius * 3.5;
+      this.color = color;
+      this.alpha = 0.8;
+      this.decay = 0.025;
+    }
+
+    update(scrollDelta) {
+      this.radius += (this.maxRadius - this.radius) * 0.08 + 0.4;
+      this.y += scrollDelta * 0.25;
+      this.alpha -= this.decay;
+    }
+
+    draw() {
+      if (this.alpha <= 0) return;
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = 1.5;
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   // Populate starfield
   for (let i = 0; i < starCount; i++) {
     stars.push(new Star());
+  }
+
+  // Populate planets pool
+  let planets = [new Planet(true), new Planet(true), new Planet(true)];
+
+  // Populate meteoroids pool (increased to 6 for highly active scene)
+  let meteoroids = [];
+  for (let i = 0; i < 6; i++) {
+    meteoroids.push(new Meteoroid());
+  }
+
+  // Explosion particle pools
+  let explosionParticles = [];
+  let explosionRings = [];
+
+  // Sun rendering details
+  let sunTime = 0;
+  function drawSun(time) {
+    const sunX = width * 0.88;
+    const sunY = 120;
+    const baseRadius = 35;
+    const pulseRadius = baseRadius + Math.sin(time * 0.02) * 5;
+    const outerRadius = pulseRadius * 2.8;
+
+    ctx.save();
+    const grad = ctx.createRadialGradient(sunX, sunY, pulseRadius * 0.2, sunX, sunY, outerRadius);
+    grad.addColorStop(0, '#ffffff'); // sun core
+    grad.addColorStop(0.12, '#fff4e0');
+    grad.addColorStop(0.3, 'rgba(255, 180, 84, 0.45)'); // sun corona glow
+    grad.addColorStop(0.55, 'rgba(255, 180, 84, 0.15)');
+    grad.addColorStop(1, 'rgba(255, 180, 84, 0)');
+
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, outerRadius, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
   }
 
   // Handle window resizing
@@ -387,9 +626,73 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
     // Smooth out scroll velocity using interpolation (decay)
     scrollVel = scrollVel * 0.88 + delta * 0.12;
 
+    // 1. Draw Background Sun
+    drawSun(sunTime);
+    sunTime++;
+
+    // 2. Update and draw stars
     stars.forEach(star => {
       star.update(delta);
       star.draw(scrollVel);
+    });
+
+    // 3. Update and draw planets
+    planets.forEach(p => {
+      p.update(delta);
+      p.draw();
+    });
+
+    // 4. Update and draw meteoroids
+    meteoroids.forEach(m => {
+      m.update(delta);
+      m.draw();
+    });
+
+    // 5. Collision checks between meteoroids and planets
+    meteoroids.forEach(m => {
+      if (!m.active) return;
+      planets.forEach(p => {
+        if (!p.active) return;
+        
+        const dist = Math.hypot(m.x - p.x, m.y - p.y);
+        if (dist < p.radius + 15) {
+          // Trigger collision deactivation
+          m.active = false;
+          m.spawnTimer = Math.random() * 250 + 100;
+          
+          p.active = false;
+          p.spawnTimer = Math.random() * 350 + 200;
+          
+          // Generate blast ember particles
+          const embersCount = 20 + Math.floor(Math.random() * 10);
+          for (let i = 0; i < embersCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 3.5 + 1.2;
+            explosionParticles.push(new ExplosionParticle(
+              p.x, p.y,
+              Math.cos(angle) * speed,
+              Math.sin(angle) * speed,
+              p.color
+            ));
+          }
+          
+          // Generate blast shockwave ring
+          explosionRings.push(new ExplosionRing(p.x, p.y, p.radius, p.color));
+        }
+      });
+    });
+
+    // 6. Update and draw blast explosions
+    explosionParticles = explosionParticles.filter(ep => {
+      ep.update(delta);
+      ep.draw();
+      return ep.life > 0 && ep.alpha > 0;
+    });
+
+    explosionRings = explosionRings.filter(er => {
+      er.update(delta);
+      er.draw();
+      return er.alpha > 0;
     });
 
     requestAnimationFrame(animate);
