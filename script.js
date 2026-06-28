@@ -281,42 +281,60 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
   if (!canvas) return;
 
   const ctx = canvas.getContext('2d');
-  let stars = [];
-  const starCount = 120;
   let width = canvas.width = window.innerWidth;
   let height = canvas.height = window.innerHeight;
 
-  // Curated color palette for stars matching the site aesthetics (pure white, soft amber, light blue)
   const colors = ['#ffffff', '#fff4e0', '#e0f7fc', '#ffb454', '#5ec8d8'];
 
+  // Sun coordinates and size
+  let sunX = width * 0.85;
+  let sunY = height * 0.35;
+  const sunRadius = 42;
+  let sunTime = 0;
+
+  function updateSunPosition() {
+    if (width < 760) {
+      sunX = width * 0.5;
+      sunY = 180;
+    } else {
+      sunX = width * 0.85;
+      sunY = 220;
+    }
+  }
+  updateSunPosition();
+
+  // Warp speed variables
+  let warpActive = false;
+  let warpTimer = 0;
+
+  window.addEventListener('triggerWarpSpeed', () => {
+    warpActive = true;
+    warpTimer = 75; // duration of warp in frames (1.25s)
+  });
+
+  // Classes
   class Star {
     constructor() {
       this.reset();
-      // Distribute stars initially across the entire screen
       this.y = Math.random() * height;
     }
 
     reset() {
       this.x = Math.random() * width;
-      this.y = -10; // Start slightly offscreen top when recycled
-      this.size = Math.random() * 1.5 + 0.3; // sizes: 0.3px to 1.8px
-      this.depth = Math.random(); // depth 0 (far) to 1 (close)
+      this.y = -10;
+      this.size = Math.random() * 1.5 + 0.3;
+      this.depth = Math.random();
       this.color = colors[Math.floor(Math.random() * colors.length)];
-      this.alpha = Math.random() * 0.4 + 0.2; // base opacity
+      this.alpha = Math.random() * 0.4 + 0.2;
       this.twinkleSpeed = Math.random() * 0.015 + 0.005;
       this.twinklePhase = Math.random() * Math.PI * 2;
     }
 
     update(scrollDelta) {
-      // Ambient slow upward drift (space floating feel)
       let speed = -0.05 * this.depth;
-      
-      // Scroll-linked parallax drift
       speed -= scrollDelta * this.depth * 0.35;
-      
       this.y += speed;
 
-      // Wrap stars around vertically when they leave the viewport
       if (this.y < -30) {
         this.y = height + 30;
         this.x = Math.random() * width;
@@ -325,28 +343,24 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
         this.x = Math.random() * width;
       }
 
-      // Twinkle pulsation
       this.twinklePhase += this.twinkleSpeed;
     }
 
-    draw(velocity) {
+    draw(velocity, factor = 1.0) {
       const currentAlpha = Math.max(0.1, Math.min(1, this.alpha + Math.sin(this.twinklePhase) * 0.12));
       ctx.fillStyle = this.color;
       ctx.globalAlpha = currentAlpha;
 
-      // Warp/stretch factor based on scroll velocity & depth
-      const stretch = velocity * this.depth * 0.25;
+      const stretch = velocity * this.depth * 0.25 * factor;
 
       if (Math.abs(stretch) > 1.0) {
-        // Draw star as a travel streak/line when scrolling fast
         ctx.beginPath();
         ctx.strokeStyle = this.color;
-        ctx.lineWidth = this.size;
+        ctx.lineWidth = this.size * (factor > 1.5 ? 1.4 : 1.0);
         ctx.moveTo(this.x, this.y);
         ctx.lineTo(this.x, this.y + stretch);
         ctx.stroke();
       } else {
-        // Draw star as a clean pixel circle when stationary or moving slowly
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         ctx.fill();
@@ -354,11 +368,49 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
     }
   }
 
+  class SolarWindParticle {
+    constructor(x, y) {
+      this.x = x;
+      this.y = y;
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 1.8 + 0.6;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.size = Math.random() * 1.5 + 0.5;
+      this.color = '#ff9639';
+      this.alpha = 0.8;
+      this.decay = Math.random() * 0.018 + 0.007;
+      this.active = true;
+    }
+
+    update(scrollDelta) {
+      this.x += this.vx;
+      this.y += this.vy + scrollDelta * 0.15;
+      this.alpha -= this.decay;
+      if (this.alpha <= 0) {
+        this.active = false;
+      }
+    }
+
+    draw() {
+      if (!this.active) return;
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   class Meteoroid {
     constructor() {
       this.reset();
       this.active = false;
-      this.spawnTimer = Math.random() * 240 + 30;
+      this.spawnTimer = Math.random() * 180 + 30;
+      this.isPlayerSpawned = false;
+      this.isGiantComet = false;
     }
 
     reset() {
@@ -370,14 +422,15 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
       this.speed = Math.random() * 7 + 5;
       this.dx = -this.speed * 0.8;
       this.dy = this.speed * 0.6;
-      this.size = Math.random() * 1.2 + 0.6;
+      this.size = Math.random() * 2.0 + 1.0;
+      this.isPlayerSpawned = false;
+      this.isGiantComet = false;
       
-      // Some meteoroids are wavy cyan "Wave Comets" (Metroid Wave Beam inspired)
-      this.isWavy = Math.random() < 0.35;
+      this.isWavy = Math.random() < 0.25;
       if (this.isWavy) {
-        this.color = '#5ec8d8'; // Light cyan blue
+        this.color = '#5ec8d8';
         this.waveFreq = Math.random() * 0.15 + 0.08;
-        this.waveAmp = Math.random() * 20 + 10;
+        this.waveAmp = Math.random() * 15 + 8;
         this.wavePhase = Math.random() * Math.PI * 2;
       } else {
         this.color = colors[Math.floor(Math.random() * colors.length)];
@@ -392,9 +445,11 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
 
     update(scrollDelta) {
       if (!this.active) {
-        this.spawnTimer--;
-        if (this.spawnTimer <= 0) {
-          this.reset();
+        if (!this.isPlayerSpawned) {
+          this.spawnTimer--;
+          if (this.spawnTimer <= 0) {
+            this.reset();
+          }
         }
         return;
       }
@@ -411,14 +466,25 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
         this.y = this.baseY;
       }
 
-      // Spawn glowing trail particles
-      if (Math.random() > 0.4) {
-        plasmaTrailParticles.push(new PlasmaTrailParticle(this.x, this.y, this.color, 0.8));
+      if (this.isPlayerSpawned && this.targetX !== undefined) {
+        const distToTarget = Math.hypot(this.x - this.targetX, this.y - this.targetY);
+        const distPrev = Math.hypot((this.x - this.dx) - this.targetX, (this.y - this.dy) - this.targetY);
+        if (distToTarget < 15 || distToTarget > distPrev) {
+          this.active = false;
+          triggerExplosion(this.targetX, this.targetY, 4, this.color, false);
+          return;
+        }
+      }
+
+      if (Math.random() > 0.35) {
+        plasmaTrailParticles.push(new PlasmaTrailParticle(this.x, this.y, this.color, this.size * 0.8));
       }
 
       if (this.baseX < -150 || this.baseY > height + 150 || this.baseX > width + 150) {
         this.active = false;
-        this.spawnTimer = Math.random() * 300 + 150;
+        if (!this.isPlayerSpawned) {
+          this.spawnTimer = Math.random() * 240 + 120;
+        }
       }
     }
 
@@ -438,7 +504,8 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
       }
 
       const grad = ctx.createLinearGradient(this.x, this.y, prevX, prevY);
-      grad.addColorStop(0, this.color);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.2, this.color);
       grad.addColorStop(1, 'rgba(0,0,0,0)');
 
       ctx.save();
@@ -446,166 +513,503 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
       ctx.strokeStyle = grad;
       ctx.lineWidth = this.size;
       ctx.lineCap = 'round';
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = this.color;
       ctx.moveTo(this.x, this.y);
       ctx.lineTo(prevX, prevY);
       ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size * 1.2, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      
       ctx.restore();
     }
   }
 
-  class Planet {
-    constructor(initial = false) {
-      this.active = false;
-      this.spawnTimer = initial ? 0 : Math.random() * 200 + 50;
-      this.radius = Math.random() * 6 + 5; // radius: 5px to 11px
-      this.color = colors[Math.floor(Math.random() * colors.length)];
-      this.opacity = Math.random() * 0.35 + 0.4;
+  class SwirlInParticle {
+    constructor(startX, startY, targetX, targetY, color) {
+      this.x = startX;
+      this.y = startY;
+      this.targetX = targetX;
+      this.targetY = targetY;
+      this.color = color;
       
-      this.vx = Math.random() * 0.16 - 0.08;
-      this.vy = Math.random() * 0.06 - 0.03;
-      
-      this.cooldown = Math.random() * 300 + 200;
-      this.target = null;
-      this.chargeTimer = 0;
-      
-      if (initial) {
-        this.x = Math.random() * width;
-        this.y = Math.random() * height;
-        this.active = true;
-      } else {
-        this.reset();
-      }
-    }
-
-    reset() {
-      if (Math.random() > 0.5) {
-        this.x = width + 50;
-        this.y = Math.random() * height;
-      } else {
-        this.x = Math.random() * width;
-        this.y = -50;
-      }
-      this.radius = Math.random() * 6 + 5;
-      this.color = colors[Math.floor(Math.random() * colors.length)];
-      this.opacity = Math.random() * 0.35 + 0.4;
-      this.vx = Math.random() * 0.16 - 0.08;
-      this.vy = Math.random() * 0.06 - 0.03;
-      this.cooldown = Math.random() * 300 + 200;
-      this.target = null;
-      this.chargeTimer = 0;
+      this.angle = Math.atan2(startY - targetY, startX - targetX);
+      this.distance = Math.hypot(startX - targetX, startY - targetY);
+      this.speed = Math.random() * 1.6 + 1.2;
+      this.size = Math.random() * 1.2 + 0.6;
+      this.alpha = 0.8;
       this.active = true;
     }
 
-    destroy() {
-      this.active = false;
-      this.target = null;
-      this.chargeTimer = 0;
-      this.spawnTimer = Math.random() * 350 + 200;
+    update() {
+      this.distance -= this.speed;
+      this.angle += 0.055;
+      
+      this.x = this.targetX + Math.cos(this.angle) * this.distance;
+      this.y = this.targetY + Math.sin(this.angle) * this.distance;
+      
+      if (this.distance <= 2) {
+        this.active = false;
+      }
+      this.alpha = Math.max(0.1, this.distance / 80);
+    }
+
+    draw() {
+      if (!this.active) return;
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  class DebrisFragment {
+    constructor(x, y, vx, vy, color) {
+      this.x = x;
+      this.y = y;
+      this.vx = vx;
+      this.vy = vy;
+      this.color = color;
+      
+      this.radius = Math.random() * 3 + 1.5;
+      this.angle = Math.random() * Math.PI * 2;
+      this.spinSpeed = (Math.random() - 0.5) * 0.15;
+      this.alpha = 1.0;
+      this.decay = Math.random() * 0.012 + 0.007;
+      
+      this.points = [];
+      const numPoints = 5 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < numPoints; i++) {
+        const a = (i / numPoints) * Math.PI * 2;
+        const offset = Math.random() * 0.4 + 0.6;
+        this.points.push({
+          x: Math.cos(a) * offset,
+          y: Math.sin(a) * offset
+        });
+      }
+      this.active = true;
     }
 
     update(scrollDelta) {
-      if (!this.active) {
-        this.spawnTimer--;
-        if (this.spawnTimer <= 0) {
-          this.reset();
-        }
-        return;
-      }
-
+      this.vx *= 0.982;
+      this.vy *= 0.982;
       this.x += this.vx;
       this.y += this.vy + scrollDelta * 0.15;
-
-      if (this.x < -100 || this.x > width + 100 || this.y < -100 || this.y > height + 100) {
+      this.angle += this.spinSpeed;
+      this.alpha -= this.decay;
+      
+      if (this.alpha <= 0) {
         this.active = false;
-        this.target = null;
-        this.chargeTimer = 0;
-        this.spawnTimer = Math.random() * 250 + 100;
-        return;
       }
-
-      // Shooting AI
-      if (this.cooldown > 0) {
-        this.cooldown--;
-      } else if (!this.target) {
-        const others = planets.filter(p => p.active && p !== this);
-        if (others.length > 0) {
-          this.target = others[Math.floor(Math.random() * others.length)];
-          this.chargeTimer = 90; // 1.5 seconds charging
-        } else {
-          this.cooldown = Math.random() * 100 + 100;
-        }
-      }
-
-      if (this.target) {
-        if (!this.target.active) {
-          this.target = null;
-          this.chargeTimer = 0;
-          this.cooldown = Math.random() * 200 + 100;
-        } else {
-          this.chargeTimer--;
-          
-          // Spiral charging particles
-          if (Math.random() > 0.3) {
-            chargingParticles.push(new ChargingParticle(this, this.color));
-          }
-
-          if (this.chargeTimer <= 0) {
-            laserBolts.push(new LaserBolt(this.x, this.y, this.target, this.color));
-            this.target = null;
-            this.cooldown = Math.random() * 400 + 300;
-          }
-        }
+      
+      if (Math.random() > 0.4) {
+        plasmaTrailParticles.push(new PlasmaTrailParticle(this.x, this.y, this.color, this.radius * 0.45));
       }
     }
 
     draw() {
       if (!this.active) return;
       ctx.save();
-      ctx.globalAlpha = this.opacity;
+      ctx.globalAlpha = this.alpha;
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.angle);
       
-      const grad = ctx.createRadialGradient(
-        this.x - this.radius * 0.25, this.y - this.radius * 0.25, this.radius * 0.05,
-        this.x, this.y, this.radius
-      );
-      grad.addColorStop(0, '#ffffff');
-      grad.addColorStop(0.3, this.color);
-      grad.addColorStop(1, '#000000');
+      ctx.fillStyle = this.color;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.5;
       
+      ctx.beginPath();
+      ctx.moveTo(this.points[0].x * this.radius, this.points[0].y * this.radius);
+      for (let i = 1; i < this.points.length; i++) {
+        ctx.lineTo(this.points[i].x * this.radius, this.points[i].y * this.radius);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  class GasCloud {
+    constructor(x, y, color) {
+      this.x = x;
+      this.y = y;
+      this.color = color;
+      this.radius = 12;
+      this.maxRadius = Math.random() * 45 + 35;
+      this.alpha = 0.6;
+      this.decay = Math.random() * 0.009 + 0.006;
+      this.active = true;
+      this.vx = (Math.random() - 0.5) * 0.7;
+      this.vy = (Math.random() - 0.5) * 0.7;
+    }
+
+    update(scrollDelta) {
+      this.x += this.vx;
+      this.y += this.vy + scrollDelta * 0.15;
+      this.radius += (this.maxRadius - this.radius) * 0.035;
+      this.alpha -= this.decay;
+      if (this.alpha <= 0) {
+        this.active = false;
+      }
+    }
+
+    draw() {
+      if (!this.active) return;
+      ctx.save();
+      const grad = ctx.createRadialGradient(this.x, this.y, this.radius * 0.1, this.x, this.y, this.radius);
+      grad.addColorStop(0, this.color);
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      
+      ctx.globalAlpha = this.alpha;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
       ctx.fillStyle = grad;
       ctx.fill();
       ctx.restore();
+    }
+  }
 
-      // Draw targeting lock system
-      if (this.target && this.target.active) {
-        ctx.save();
-        const progress = (90 - this.chargeTimer) / 90;
-        ctx.strokeStyle = `rgba(255, 84, 84, ${0.2 + progress * 0.6})`;
+  class Planet {
+    constructor(typeIndex, initial = false) {
+      this.typeIndex = typeIndex;
+      this.active = true;
+      this.state = 'normal';
+      
+      this.angle = initial ? Math.random() * Math.PI * 2 : 0;
+      this.respawnTimer = 0;
+      this.collisionTarget = null;
+      this.collisionSpeed = 0;
+      
+      this.initOrbit();
+    }
+
+    initOrbit() {
+      const orbitScales = [
+        { a: 160, b: 65, r: 9, speed: 0.006, name: 'Vulcan' },
+        { a: 280, b: 110, r: 16, speed: 0.003, name: 'Tiamat' },
+        { a: 420, b: 160, r: 13, speed: 0.0016, name: 'Zephyr' },
+        { a: 560, b: 210, r: 15, speed: 0.0009, name: 'Aether' }
+      ];
+      
+      const config = orbitScales[this.typeIndex];
+      this.baseA = config.a;
+      this.baseB = config.b;
+      this.a = this.baseA;
+      this.b = this.baseB;
+      this.radius = config.r;
+      this.speed = config.speed;
+      this.name = config.name;
+      
+      const tilts = [0.15, -0.22, 0.08, -0.12];
+      this.orbitRotate = tilts[this.typeIndex];
+      
+      this.x = 0;
+      this.y = 0;
+      this.updatePosition();
+    }
+
+    updatePosition() {
+      if (this.state === 'normal') {
+        const cosRot = Math.cos(this.orbitRotate);
+        const sinRot = Math.sin(this.orbitRotate);
+        const ex = this.a * Math.cos(this.angle);
+        const ey = this.b * Math.sin(this.angle);
+        
+        this.x = sunX + ex * cosRot - ey * sinRot;
+        this.y = sunY + ex * sinRot + ey * cosRot;
+      }
+    }
+
+    decayOrbit() {
+      this.a *= 0.987;
+      this.b *= 0.987;
+      this.angle += this.speed * 1.4;
+      
+      const cosRot = Math.cos(this.orbitRotate);
+      const sinRot = Math.sin(this.orbitRotate);
+      const ex = this.a * Math.cos(this.angle);
+      const ey = this.b * Math.sin(this.angle);
+      
+      this.x = sunX + ex * cosRot - ey * sinRot;
+      this.y = sunY + ex * sinRot + ey * cosRot;
+      
+      if (Math.random() > 0.3) {
+        plasmaTrailParticles.push(new PlasmaTrailParticle(this.x, this.y, '#ff781e', this.radius * 0.15));
+      }
+    }
+
+    moveToCollision() {
+      if (!this.collisionTarget) return;
+      
+      const dx = this.collisionTarget.x - this.x;
+      const dy = this.collisionTarget.y - this.y;
+      const dist = Math.hypot(dx, dy);
+      
+      this.collisionSpeed += 0.14;
+      this.x += (dx / dist) * this.collisionSpeed;
+      this.y += (dy / dist) * this.collisionSpeed;
+      
+      if (Math.random() > 0.4) {
+        plasmaTrailParticles.push(new PlasmaTrailParticle(this.x, this.y, '#e0f7fc', this.radius * 0.2));
+      }
+    }
+
+    destroy() {
+      this.state = 'destroyed';
+      this.active = false;
+      this.respawnTimer = 240;
+    }
+
+    update(scrollDelta) {
+      if (this.state === 'destroyed') {
+        this.respawnTimer--;
+        if (this.respawnTimer <= 0) {
+          this.state = 'respawning';
+          this.respawnTimer = 180;
+        }
+        return;
+      }
+
+      if (this.state === 'respawning') {
+        this.respawnTimer--;
+        const targetAngle = this.angle + this.speed;
+        this.angle = targetAngle;
+        
+        const cosRot = Math.cos(this.orbitRotate);
+        const sinRot = Math.sin(this.orbitRotate);
+        const ex = this.baseA * Math.cos(targetAngle);
+        const ey = this.baseB * Math.sin(targetAngle);
+        const tx = sunX + ex * cosRot - ey * sinRot;
+        const ty = sunY + ex * sinRot + ey * cosRot;
+        
+        if (this.respawnTimer > 0) {
+          if (Math.random() > 0.4) {
+            const swirlR = (this.respawnTimer / 180) * 80 + 5;
+            const swirlA = Math.random() * Math.PI * 2;
+            const px = tx + Math.cos(swirlA) * swirlR;
+            const py = ty + Math.sin(swirlA) * swirlR;
+            
+            chargingParticles.push(new SwirlInParticle(px, py, tx, ty, this.getColor()));
+          }
+        } else {
+          this.initOrbit();
+          this.state = 'normal';
+          this.active = true;
+        }
+        return;
+      }
+
+      if (this.state === 'normal') {
+        this.angle += this.speed;
+        this.updatePosition();
+      } else if (this.state === 'decaying') {
+        this.decayOrbit();
+      } else if (this.state === 'colliding') {
+        this.moveToCollision();
+      }
+
+      this.y += scrollDelta * 0.15;
+    }
+
+    getColor() {
+      const colors = ['#ff5400', '#ffb454', '#5ec8d8', '#e65ed8'];
+      return colors[this.typeIndex];
+    }
+
+    draw() {
+      if (this.state === 'destroyed' || this.state === 'respawning') return;
+      
+      const shadowAngle = Math.atan2(this.y - sunY, this.x - sunX);
+      
+      ctx.save();
+      if (this.state === 'decaying') {
+        ctx.strokeStyle = 'rgba(255, 84, 84, 0.45)';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
-        
         ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.target.x, this.target.y);
+        ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI * 2);
         ctx.stroke();
-
-        // Draw crosshair reticle
-        ctx.translate(this.target.x, this.target.y);
-        ctx.rotate((progress * Math.PI * 2) + sunTime * 0.015);
-        ctx.strokeStyle = progress > 0.85 ? '#ff5454' : this.color;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([]);
-        
-        const size = this.target.radius + 6;
-        ctx.beginPath();
-        ctx.moveTo(-size, -size / 2); ctx.lineTo(-size, -size); ctx.lineTo(-size / 2, -size);
-        ctx.moveTo(size / 2, -size); ctx.lineTo(size, -size); ctx.lineTo(size, -size / 2);
-        ctx.moveTo(size, size / 2); ctx.lineTo(size, size); ctx.lineTo(size / 2, size);
-        ctx.moveTo(-size / 2, size); ctx.lineTo(-size, size); ctx.lineTo(-size, size / 2);
-        ctx.stroke();
-        ctx.restore();
       }
+      ctx.restore();
+
+      switch (this.typeIndex) {
+        case 0:
+          this.drawLavaPlanet(shadowAngle);
+          break;
+        case 1:
+          this.drawGasGiant(shadowAngle);
+          break;
+        case 2:
+          this.drawIcePlanet(shadowAngle);
+          break;
+        case 3:
+          this.drawNebulaPlanet(shadowAngle);
+          break;
+      }
+    }
+
+    drawLavaPlanet(shadowAngle) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#220808';
+      ctx.fill();
+      
+      ctx.clip();
+      ctx.strokeStyle = '#ff3c00';
+      ctx.lineWidth = 1.2;
+      ctx.shadowBlur = 3;
+      ctx.shadowColor = '#ff3c00';
+      
+      ctx.beginPath();
+      ctx.moveTo(this.x - this.radius, this.y - this.radius/2);
+      ctx.bezierCurveTo(this.x - this.radius/3, this.y + this.radius/3, this.x + this.radius/3, this.y - this.radius/3, this.x + this.radius, this.y + this.radius/2);
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(this.x - this.radius/2, this.y + this.radius);
+      ctx.quadraticCurveTo(this.x + this.radius/4, this.y - this.radius/4, this.x + this.radius/2, this.y - this.radius);
+      ctx.stroke();
+      
+      ctx.restore();
+      
+      this.drawShadow(shadowAngle);
+      
+      ctx.save();
+      const grad = ctx.createRadialGradient(this.x, this.y, this.radius * 0.8, this.x, this.y, this.radius * 1.3);
+      grad.addColorStop(0, 'rgba(255, 60, 0, 0.3)');
+      grad.addColorStop(1, 'rgba(255, 60, 0, 0)');
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius * 1.3, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    drawGasGiant(shadowAngle) {
+      const ringAngle = Math.PI / 5;
+      
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(ringAngle);
+      ctx.strokeStyle = 'rgba(184, 132, 61, 0.35)';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, this.radius * 2.1, this.radius * 0.35, 0, Math.PI, 0);
+      ctx.stroke();
+      ctx.restore();
+      
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#b8843d';
+      ctx.fill();
+      ctx.clip();
+      
+      ctx.fillStyle = '#7a5421';
+      ctx.fillRect(this.x - this.radius, this.y - this.radius * 0.4, this.radius * 2, this.radius * 0.15);
+      ctx.fillStyle = '#e3b67d';
+      ctx.fillRect(this.x - this.radius, this.y - this.radius * 0.1, this.radius * 2, this.radius * 0.12);
+      ctx.fillStyle = '#94662d';
+      ctx.fillRect(this.x - this.radius, this.y + this.radius * 0.25, this.radius * 2, this.radius * 0.2);
+      ctx.restore();
+      
+      this.drawShadow(shadowAngle);
+      
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(ringAngle);
+      ctx.strokeStyle = 'rgba(255, 180, 84, 0.7)';
+      ctx.lineWidth = 3.5;
+      ctx.shadowBlur = 5;
+      ctx.shadowColor = '#ffb454';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, this.radius * 2.1, this.radius * 0.35, 0, 0, Math.PI);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    drawIcePlanet(shadowAngle) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      
+      const grad = ctx.createRadialGradient(
+        this.x - this.radius * 0.25, this.y - this.radius * 0.25, this.radius * 0.05,
+        this.x, this.y, this.radius
+      );
+      grad.addColorStop(0, '#e0f7fc');
+      grad.addColorStop(0.35, '#5ec8d8');
+      grad.addColorStop(1, '#1b4f59');
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.restore();
+      
+      this.drawShadow(shadowAngle);
+      
+      ctx.save();
+      const glow = ctx.createRadialGradient(this.x, this.y, this.radius * 0.75, this.x, this.y, this.radius * 1.35);
+      glow.addColorStop(0, 'rgba(94, 200, 216, 0.45)');
+      glow.addColorStop(1, 'rgba(94, 200, 216, 0)');
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius * 1.35, 0, Math.PI * 2);
+      ctx.fillStyle = glow;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    drawNebulaPlanet(shadowAngle) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#0f051c';
+      ctx.fill();
+      ctx.restore();
+      
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      for (let i = 0; i < 3; i++) {
+        const cloudX = this.x + Math.sin(sunTime * 0.02 + i * 2) * (this.radius * 0.35);
+        const cloudY = this.y + Math.cos(sunTime * 0.015 + i * 2) * (this.radius * 0.25);
+        const cloudR = this.radius * (0.8 + i * 0.22);
+        
+        const cloudGrad = ctx.createRadialGradient(cloudX, cloudY, 0, cloudX, cloudY, cloudR);
+        cloudGrad.addColorStop(0, i === 0 ? 'rgba(230, 94, 216, 0.35)' : 'rgba(120, 94, 216, 0.22)');
+        cloudGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        
+        ctx.beginPath();
+        ctx.arc(cloudX, cloudY, cloudR, 0, Math.PI * 2);
+        ctx.fillStyle = cloudGrad;
+        ctx.fill();
+      }
+      ctx.restore();
+      
+      this.drawShadow(shadowAngle);
+    }
+
+    drawShadow(angle) {
+      ctx.save();
+      
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius + 0.1, 0, Math.PI * 2);
+      ctx.clip();
+      
+      ctx.translate(this.x, this.y);
+      ctx.rotate(angle);
+      
+      ctx.fillStyle = 'rgba(5, 7, 8, 0.7)';
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius + 1, -Math.PI / 2, Math.PI / 2);
+      ctx.fill();
+      
+      ctx.restore();
     }
   }
 
@@ -618,13 +1022,13 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
       this.color = color;
       this.size = Math.random() * 2.2 + 1.0;
       this.alpha = 1.0;
-      this.decay = Math.random() * 0.016 + 0.01;
+      this.decay = Math.random() * 0.015 + 0.009;
       this.life = 70;
     }
 
     update(scrollDelta) {
-      this.vy += 0.03; // gravity physics
-      this.vx *= 0.98; // air resistance friction
+      this.vy += 0.035;
+      this.vx *= 0.98;
       this.vy *= 0.98;
       this.x += this.vx;
       this.y += this.vy + scrollDelta * 0.25;
@@ -651,10 +1055,10 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
       this.x = x;
       this.y = y;
       this.radius = startRadius;
-      this.maxRadius = startRadius * 3.5;
+      this.maxRadius = startRadius * 3.8;
       this.color = color;
       this.alpha = 0.8;
-      this.decay = 0.025;
+      this.decay = 0.022;
     }
 
     update(scrollDelta) {
@@ -668,8 +1072,8 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
       ctx.save();
       ctx.globalAlpha = this.alpha;
       ctx.strokeStyle = this.color;
-      ctx.lineWidth = 1.5;
-      ctx.shadowBlur = 6;
+      ctx.lineWidth = 1.8;
+      ctx.shadowBlur = 8;
       ctx.shadowColor = this.color;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
@@ -687,7 +1091,7 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
       this.color = color;
       this.size = (Math.random() * 1.5 + 0.5) * sizeMultiplier;
       this.alpha = 0.8;
-      this.decay = Math.random() * 0.03 + 0.02;
+      this.decay = Math.random() * 0.028 + 0.018;
     }
 
     update(scrollDelta) {
@@ -708,178 +1112,6 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
     }
   }
 
-  class ChargingParticle {
-    constructor(targetObj, color) {
-      this.targetObj = targetObj;
-      this.color = color;
-      this.angle = Math.random() * Math.PI * 2;
-      this.distance = Math.random() * 40 + 20;
-      this.speed = Math.random() * 1.2 + 0.8;
-      this.size = Math.random() * 1.2 + 0.6;
-      this.alpha = 0.8;
-      this.active = true;
-    }
-
-    update() {
-      if (!this.targetObj) {
-        this.active = false;
-        return;
-      }
-      this.distance -= this.speed;
-      this.angle += 0.08;
-      if (this.distance <= 2) {
-        this.active = false;
-      }
-      this.x = this.targetObj.x + Math.cos(this.angle) * this.distance;
-      this.y = this.targetObj.y + Math.sin(this.angle) * this.distance;
-    }
-
-    draw() {
-      if (!this.active || this.alpha <= 0) return;
-      ctx.save();
-      ctx.globalAlpha = this.alpha;
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-
-  class LaserBolt {
-    constructor(startX, startY, targetPlanet, color) {
-      this.x = startX;
-      this.y = startY;
-      this.target = targetPlanet;
-      this.color = color;
-      this.speed = 4.5;
-      this.active = true;
-      this.size = 2.0;
-      
-      const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
-      this.vx = Math.cos(angle) * this.speed;
-      this.vy = Math.sin(angle) * this.speed;
-    }
-
-    update(scrollDelta) {
-      if (!this.active) return;
-
-      if (!this.target || !this.target.active) {
-        this.x += this.vx;
-        this.y += this.vy + scrollDelta * 0.15;
-        if (this.x < -100 || this.x > width + 100 || this.y < -100 || this.y > height + 100) {
-          this.active = false;
-        }
-        return;
-      }
-
-      let tx = this.target.x;
-      let ty = this.target.y;
-      
-      const angle = Math.atan2(ty - this.y, tx - this.x);
-      this.vx = this.vx * 0.85 + Math.cos(angle) * this.speed * 0.15;
-      this.vy = this.vy * 0.85 + Math.sin(angle) * this.speed * 0.15;
-
-      this.x += this.vx;
-      this.y += this.vy + scrollDelta * 0.15;
-
-      if (Math.random() > 0.3) {
-        plasmaTrailParticles.push(new PlasmaTrailParticle(this.x, this.y, this.color, 1.2));
-      }
-
-      const dist = Math.hypot(this.x - tx, this.y - ty);
-      if (dist < this.target.radius + 5) {
-        this.active = false;
-        triggerExplosion(tx, ty, this.target.radius, this.target.color, false);
-        this.target.destroy();
-      }
-    }
-
-    draw() {
-      if (!this.active) return;
-      ctx.save();
-      ctx.strokeStyle = this.color;
-      ctx.lineWidth = this.size;
-      ctx.shadowBlur = 6;
-      ctx.shadowColor = this.color;
-      
-      const angle = Math.atan2(this.vy, this.vx);
-      ctx.beginPath();
-      ctx.moveTo(this.x, this.y);
-      ctx.lineTo(this.x - Math.cos(angle) * 15, this.y - Math.sin(angle) * 15);
-      ctx.stroke();
-      ctx.restore();
-    }
-  }
-
-  class SolarBlast {
-    constructor(startX, startY, targetPlanet, color) {
-      this.x = startX;
-      this.y = startY;
-      this.target = targetPlanet;
-      this.color = color;
-      this.speed = 3.5;
-      this.radius = 8.0;
-      this.active = true;
-      
-      const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
-      this.vx = Math.cos(angle) * this.speed;
-      this.vy = Math.sin(angle) * this.speed;
-    }
-
-    update(scrollDelta) {
-      if (!this.active) return;
-
-      if (!this.target || !this.target.active) {
-        this.x += this.vx;
-        this.y += this.vy + scrollDelta * 0.15;
-        if (Math.random() > 0.2) {
-          plasmaTrailParticles.push(new PlasmaTrailParticle(this.x, this.y, this.color, 1.8));
-        }
-        if (this.x < -100 || this.x > width + 100 || this.y < -100 || this.y > height + 100) {
-          this.active = false;
-        }
-        return;
-      }
-
-      let tx = this.target.x;
-      let ty = this.target.y;
-      
-      const angle = Math.atan2(ty - this.y, tx - this.x);
-      this.vx = this.vx * 0.9 + Math.cos(angle) * this.speed * 0.1;
-      this.vy = this.vy * 0.9 + Math.sin(angle) * this.speed * 0.1;
-
-      this.x += this.vx;
-      this.y += this.vy + scrollDelta * 0.15;
-
-      if (Math.random() > 0.2) {
-        plasmaTrailParticles.push(new PlasmaTrailParticle(this.x, this.y, this.color, 1.8));
-      }
-
-      const dist = Math.hypot(this.x - tx, this.y - ty);
-      if (dist < this.target.radius + this.radius) {
-        this.active = false;
-        triggerExplosion(tx, ty, this.target.radius * 1.5, '#ffb454', true);
-        this.target.destroy();
-      }
-    }
-
-    draw() {
-      if (!this.active) return;
-      ctx.save();
-      const grad = ctx.createRadialGradient(this.x, this.y, 1, this.x, this.y, this.radius);
-      grad.addColorStop(0, '#ffffff');
-      grad.addColorStop(0.4, '#ffb454');
-      grad.addColorStop(1, 'rgba(255, 180, 84, 0)');
-      
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius * 1.5, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-
   // Camera Shake & Explosions Helper
   let shakeTime = 0;
   let shakeMaxTime = 0;
@@ -889,7 +1121,7 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
     const embersCount = isHeavy ? 35 + Math.floor(Math.random() * 15) : 20 + Math.floor(Math.random() * 10);
     for (let i = 0; i < embersCount; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = isHeavy ? Math.random() * 5.0 + 2.0 : Math.random() * 3.5 + 1.2;
+      const speed = isHeavy ? Math.random() * 6.5 + 2.5 : Math.random() * 4.0 + 1.2;
       explosionParticles.push(new ExplosionParticle(
         x, y,
         Math.cos(angle) * speed,
@@ -897,120 +1129,180 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
         color
       ));
     }
-    explosionRings.push(new ExplosionRing(x, y, radius, color));
     
-    shakeTime = isHeavy ? 25 : 12;
+    const fragmentCount = isHeavy ? 10 + Math.floor(Math.random() * 5) : 5 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < fragmentCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 3.5 + 1.0;
+      debrisFragments.push(new DebrisFragment(
+        x, y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        color
+      ));
+    }
+    
+    explosionRings.push(new ExplosionRing(x, y, radius, color));
+    if (isHeavy) {
+      explosionRings.push(new ExplosionRing(x, y, radius * 0.5, '#ffffff'));
+    }
+    
+    const gasCount = isHeavy ? 4 : 2;
+    for (let i = 0; i < gasCount; i++) {
+      gasClouds.push(new GasCloud(
+        x + (Math.random() - 0.5) * 10,
+        y + (Math.random() - 0.5) * 10,
+        color
+      ));
+    }
+    
+    shakeTime = isHeavy ? 28 : 14;
     shakeMaxTime = shakeTime;
-    shakeAmount = isHeavy ? 6.0 : 3.0;
+    shakeAmount = isHeavy ? 7.5 : 3.5;
   }
 
-  // Populate starfield
+  // Draw Orbit Faint Dashed Lines
+  function drawOrbitLine(p) {
+    ctx.save();
+    ctx.translate(sunX, sunY);
+    ctx.rotate(p.orbitRotate);
+    
+    ctx.strokeStyle = 'rgba(94, 200, 216, 0.04)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
+    
+    ctx.beginPath();
+    ctx.ellipse(0, 0, p.baseA, p.baseB, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    ctx.restore();
+  }
+
+  // Draw Sun
+  function drawSun(x, y, time) {
+    ctx.save();
+    
+    const baseRadius = 45;
+    const pulse = Math.sin(time * 0.02) * 4;
+    const sunR = baseRadius + pulse;
+    
+    ctx.fillStyle = 'rgba(255, 120, 30, 0.18)';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#ff5400';
+    const numFlares = 8;
+    for (let i = 0; i < numFlares; i++) {
+      const angle = (i * Math.PI * 2 / numFlares) + time * 0.004;
+      const flareLen = sunR * (1.3 + Math.sin(time * 0.05 + i) * 0.15);
+      
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      const cp1x = x + Math.cos(angle - 0.2) * (sunR * 0.8);
+      const cp1y = y + Math.sin(angle - 0.2) * (sunR * 0.8);
+      const destX = x + Math.cos(angle) * flareLen;
+      const destY = y + Math.sin(angle) * flareLen;
+      const cp2x = x + Math.cos(angle + 0.2) * (sunR * 0.8);
+      const cp2y = y + Math.sin(angle + 0.2) * (sunR * 0.8);
+      
+      ctx.quadraticCurveTo(cp1x, cp1y, destX, destY);
+      ctx.quadraticCurveTo(cp2x, cp2y, x, y);
+      ctx.fill();
+    }
+    
+    const outerGrad = ctx.createRadialGradient(x, y, sunR * 0.5, x, y, sunR * 3.5);
+    outerGrad.addColorStop(0, '#ffffff');
+    outerGrad.addColorStop(0.1, '#ffebad');
+    outerGrad.addColorStop(0.25, '#ffb454');
+    outerGrad.addColorStop(0.5, 'rgba(255, 84, 0, 0.42)');
+    outerGrad.addColorStop(0.75, 'rgba(255, 84, 0, 0.14)');
+    outerGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.beginPath();
+    ctx.arc(x, y, sunR * 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = outerGrad;
+    ctx.fill();
+    
+    ctx.beginPath();
+    ctx.arc(x, y, sunR, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#fff4e0';
+    ctx.fill();
+    
+    ctx.restore();
+    
+    if (Math.random() > 0.4 && solarWindParticles.length < 150) {
+      solarWindParticles.push(new SolarWindParticle(x, y));
+    }
+  }
+
+  // Pools
+  let stars = [];
+  const starCount = 120;
   for (let i = 0; i < starCount; i++) {
     stars.push(new Star());
   }
 
-  // Populate pools
-  let planets = [new Planet(true), new Planet(true), new Planet(true)];
+  let planets = [
+    new Planet(0, true),
+    new Planet(1, true),
+    new Planet(2, true),
+    new Planet(3, true)
+  ];
+
   let meteoroids = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 5; i++) {
     meteoroids.push(new Meteoroid());
   }
 
-  let explosionParticles = [];
-  let explosionRings = [];
+  let solarWindParticles = [];
   let chargingParticles = [];
   let plasmaTrailParticles = [];
-  let laserBolts = [];
-  let solarBlasts = [];
+  let explosionParticles = [];
+  let explosionRings = [];
+  let debrisFragments = [];
+  let gasClouds = [];
 
-  // Sun variables and function
-  let sunTime = 0;
-  let sunState = 'idle';
-  let sunCooldown = Math.random() * 300 + 200;
-  let sunChargeTimer = 0;
-  let sunTargetPlanet = null;
+  // Cosmic Event Manager
+  let activeEvent = null;
+  let eventTimer = 220; // frames before first event
 
-  function updateAndDrawSun(time, scrollDelta) {
-    const sunX = width * 0.88;
-    const sunY = 120;
-
-    if (sunState === 'idle') {
-      if (sunCooldown > 0) {
-        sunCooldown--;
-      } else {
-        const activePlanets = planets.filter(p => p.active);
-        if (activePlanets.length > 0) {
-          sunTargetPlanet = activePlanets[Math.floor(Math.random() * activePlanets.length)];
-          sunState = 'charging';
-          sunChargeTimer = 120; // 2 seconds
-        } else {
-          sunCooldown = 100;
-        }
-      }
-    } else if (sunState === 'charging') {
-      if (!sunTargetPlanet || !sunTargetPlanet.active) {
-        sunState = 'idle';
-        sunCooldown = 120;
-        sunTargetPlanet = null;
-        sunChargeTimer = 0;
-      } else {
-        sunChargeTimer--;
-        if (Math.random() > 0.15) {
-          chargingParticles.push(new ChargingParticle({ x: sunX, y: sunY }, '#ffb454'));
-        }
-        if (sunChargeTimer <= 0) {
-          solarBlasts.push(new SolarBlast(sunX, sunY, sunTargetPlanet, '#ffb454'));
-          sunState = 'idle';
-          sunCooldown = Math.random() * 500 + 400;
-          sunTargetPlanet = null;
-        }
-      }
+  // Mouse Clicking to launch comets
+  window.addEventListener('click', (e) => {
+    if (prefersReducedMotion) return;
+    
+    if (e.target.closest('a') || e.target.closest('button') || e.target.closest('.float-card')) {
+      return;
     }
 
-    const baseRadius = 35;
-    let pulseRadius = baseRadius + Math.sin(time * 0.02) * 5;
-    if (sunState === 'charging') {
-      pulseRadius += Math.sin(time * 0.25) * 4 + 2;
-    }
-    const outerRadius = pulseRadius * 2.8;
+    const startFromRight = Math.random() > 0.5;
+    const startX = startFromRight ? width + 50 : -50;
+    const startY = Math.random() * height;
 
-    ctx.save();
-    if (sunState === 'charging' && sunTargetPlanet) {
-      const chargeRatio = (120 - sunChargeTimer) / 120;
-      ctx.strokeStyle = `rgba(255, 180, 84, ${0.15 + chargeRatio * 0.55})`;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.moveTo(sunX, sunY);
-      ctx.lineTo(sunTargetPlanet.x, sunTargetPlanet.y);
-      ctx.stroke();
+    const customMeteor = new Meteoroid();
+    customMeteor.x = startX;
+    customMeteor.y = startY;
+    customMeteor.baseX = startX;
+    customMeteor.baseY = startY;
 
-      ctx.beginPath();
-      ctx.arc(sunX, sunY, baseRadius + 15 - chargeRatio * 15, 0, Math.PI * 2);
-      ctx.strokeStyle = '#ffb454';
-      ctx.setLineDash([]);
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
+    const angle = Math.atan2(e.clientY - startY, e.clientX - startX);
+    customMeteor.speed = Math.random() * 8 + 12;
+    customMeteor.dx = Math.cos(angle) * customMeteor.speed;
+    customMeteor.dy = Math.sin(angle) * customMeteor.speed;
+    customMeteor.length = Math.random() * 50 + 70;
+    customMeteor.size = Math.random() * 1.5 + 2.0;
+    customMeteor.color = colors[Math.floor(Math.random() * colors.length)];
+    customMeteor.active = true;
+    customMeteor.isPlayerSpawned = true;
+    customMeteor.targetX = e.clientX;
+    customMeteor.targetY = e.clientY;
 
-    const grad = ctx.createRadialGradient(sunX, sunY, pulseRadius * 0.2, sunX, sunY, outerRadius);
-    grad.addColorStop(0, '#ffffff');
-    grad.addColorStop(0.12, '#fff4e0');
-    grad.addColorStop(0.3, 'rgba(255, 180, 84, 0.45)');
-    grad.addColorStop(0.55, 'rgba(255, 180, 84, 0.15)');
-    grad.addColorStop(1, 'rgba(255, 180, 84, 0)');
-
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, outerRadius, 0, Math.PI * 2);
-    ctx.fillStyle = grad;
-    ctx.fill();
-    ctx.restore();
-  }
+    meteoroids.push(customMeteor);
+  });
 
   // Handle window resizing
   window.addEventListener('resize', () => {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
+    updateSunPosition();
     if (prefersReducedMotion) {
       ctx.clearRect(0, 0, width, height);
       stars.forEach(star => star.draw(0));
@@ -1029,18 +1321,28 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
     try {
       ctx.clearRect(0, 0, width, height);
 
-      // Overflow safety checks
+      // Pools overflow bounds check
       if (chargingParticles.length > 500) chargingParticles = [];
       if (plasmaTrailParticles.length > 500) plasmaTrailParticles = [];
       if (explosionParticles.length > 500) explosionParticles = [];
-      if (laserBolts.length > 100) laserBolts = [];
-      if (solarBlasts.length > 100) solarBlasts = [];
-      if (explosionRings.length > 100) explosionRings = [];
-
-
+      if (solarWindParticles.length > 300) solarWindParticles = [];
+      if (debrisFragments.length > 300) debrisFragments = [];
+      if (gasClouds.length > 200) gasClouds = [];
+      if (meteoroids.length > 50) meteoroids = meteoroids.filter(m => m.active || !m.isPlayerSpawned);
 
       const delta = scrollDelta;
       scrollDelta = 0;
+
+      let stretchFactor = 1.0;
+      let warpDelta = 0;
+      if (warpTimer > 0) {
+        warpTimer--;
+        const progress = (75 - warpTimer) / 75;
+        const bell = Math.sin(progress * Math.PI);
+        stretchFactor = 1.0 + bell * 34.0;
+        warpDelta = bell * 26.0;
+        scrollVel = scrollVel * 0.4 + bell * 28.0;
+      }
 
       scrollVel = scrollVel * 0.88 + delta * 0.12;
 
@@ -1055,73 +1357,67 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
         shakeTime--;
       }
 
-      // 1. Draw Background Sun
-      updateAndDrawSun(sunTime, delta);
+      // 1. Draw Orbit Lines
+      planets.forEach(p => drawOrbitLine(p));
+
+      // 2. Draw Sun
+      drawSun(sunX, sunY, sunTime);
       sunTime++;
 
-      // 2. Update and draw stars
+      // 3. Update and draw stars
       stars.forEach(star => {
-        star.update(delta);
-        star.draw(scrollVel);
+        star.update(delta + warpDelta);
+        star.draw(scrollVel, stretchFactor);
       });
 
-      // 3. Update and draw planets
+      // 4. Update and draw planets
       planets.forEach(p => {
         p.update(delta);
         p.draw();
       });
 
-      // 4. Update and draw meteoroids
+      // 5. Update and draw meteoroids
       meteoroids.forEach(m => {
         m.update(delta);
         m.draw();
       });
 
-      // 5. Charging swirl particles
+      // 6. Swirl/charging particles
       chargingParticles = chargingParticles.filter(cp => {
         cp.update();
         cp.draw();
         return cp.active;
       });
 
-      // 6. Plasma trails
+      // 7. Solar Wind
+      solarWindParticles = solarWindParticles.filter(swp => {
+        swp.update(delta);
+        swp.draw();
+        return swp.active;
+      });
+
+      // 8. Plasma trails
       plasmaTrailParticles = plasmaTrailParticles.filter(pt => {
         pt.update(delta);
         pt.draw();
         return pt.alpha > 0;
       });
 
-      // 7. Laser bolts
-      laserBolts = laserBolts.filter(lb => {
-        lb.update(delta);
-        lb.draw();
-        return lb.active;
+      // 9. Debris fragments
+      debrisFragments = debrisFragments.filter(df => {
+        df.update(delta);
+        df.draw();
+        return df.active;
       });
 
-      // 8. Solar blasts
-      solarBlasts = solarBlasts.filter(sb => {
-        sb.update(delta);
-        sb.draw();
-        return sb.active;
+      // 10. Gas Clouds
+      gasClouds = gasClouds.filter(gc => {
+        gc.update(delta);
+        gc.draw();
+        return gc.active;
       });
 
-      // 9. Collision checks between meteoroids and planets
-      meteoroids.forEach(m => {
-        if (!m.active) return;
-        planets.forEach(p => {
-          if (!p.active) return;
-          
-          const dist = Math.hypot(m.x - p.x, m.y - p.y);
-          if (dist < p.radius + 15) {
-            m.active = false;
-            m.spawnTimer = Math.random() * 250 + 100;
-            p.destroy();
-            triggerExplosion(p.x, p.y, p.radius, p.color, false);
-          }
-        });
-      });
-
-      // 10. Update and draw blast explosions
+      // 11. Explosion Particles and Rings
       explosionParticles = explosionParticles.filter(ep => {
         ep.update(delta);
         ep.draw();
@@ -1134,6 +1430,146 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
         return er.alpha > 0;
       });
 
+      // 12. Dynamic Event Manager processing
+      if (!activeEvent) {
+        eventTimer--;
+        if (eventTimer <= 0) {
+          const livingPlanets = planets.filter(p => p.state === 'normal');
+          if (livingPlanets.length > 0) {
+            const choice = Math.random();
+            if (choice < 0.35 && livingPlanets.length >= 2) {
+              const p1 = livingPlanets[0];
+              const p2 = livingPlanets[1];
+              p1.state = 'colliding';
+              p2.state = 'colliding';
+              p1.collisionTarget = p2;
+              p2.collisionTarget = p1;
+              p1.collisionSpeed = 1.0;
+              p2.collisionSpeed = 1.0;
+              
+              activeEvent = {
+                type: 'planet-planet',
+                p1: p1,
+                p2: p2
+              };
+            } else if (choice < 0.7) {
+              const p = livingPlanets[Math.floor(Math.random() * livingPlanets.length)];
+              p.state = 'decaying';
+              activeEvent = {
+                type: 'orbit-decay',
+                p: p
+              };
+            } else {
+              const p = livingPlanets[Math.floor(Math.random() * livingPlanets.length)];
+              
+              const startFromRight = Math.random() > 0.5;
+              const startX = startFromRight ? width + 100 : -100;
+              const startY = Math.random() * (height * 0.4);
+              
+              const giantComet = new Meteoroid();
+              giantComet.x = startX;
+              giantComet.y = startY;
+              giantComet.baseX = startX;
+              giantComet.baseY = startY;
+              giantComet.radius = 6;
+              giantComet.size = 3.5;
+              giantComet.length = 120;
+              giantComet.color = '#ff3c00';
+              
+              const angle = Math.atan2(p.y - startY, p.x - startX);
+              giantComet.speed = 10;
+              giantComet.dx = Math.cos(angle) * giantComet.speed;
+              giantComet.dy = Math.sin(angle) * giantComet.speed;
+              
+              giantComet.active = true;
+              giantComet.isGiantComet = true;
+              giantComet.targetPlanet = p;
+              
+              meteoroids.push(giantComet);
+              
+              activeEvent = {
+                type: 'giant-comet',
+                comet: giantComet,
+                p: p
+              };
+            }
+          }
+        }
+      } else {
+        let eventConcluded = false;
+        if (activeEvent.type === 'planet-planet') {
+          if (activeEvent.p1.state !== 'colliding' || activeEvent.p2.state !== 'colliding') {
+            eventConcluded = true;
+          }
+        } else if (activeEvent.type === 'orbit-decay') {
+          if (activeEvent.p.state !== 'decaying') {
+            eventConcluded = true;
+          }
+        } else if (activeEvent.type === 'giant-comet') {
+          if (!activeEvent.comet.active || activeEvent.p.state !== 'normal') {
+            eventConcluded = true;
+          }
+        }
+        
+        if (eventConcluded) {
+          activeEvent = null;
+          eventTimer = Math.random() * 500 + 400;
+        }
+      }
+
+      // 13. Physics & Collisions checking
+      planets.forEach(p => {
+        if (p.state === 'decaying') {
+          const distToSun = Math.hypot(p.x - sunX, p.y - sunY);
+          if (distToSun < sunRadius + p.radius + 8) {
+            triggerExplosion(p.x, p.y, p.radius * 1.5, p.getColor(), true);
+            p.destroy();
+          }
+        }
+      });
+
+      if (activeEvent && activeEvent.type === 'planet-planet') {
+        const p1 = activeEvent.p1;
+        const p2 = activeEvent.p2;
+        if (p1.state === 'colliding' && p2.state === 'colliding') {
+          const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+          if (dist < p1.radius + p2.radius + 6) {
+            const mx = (p1.x + p2.x) / 2;
+            const my = (p1.y + p2.y) / 2;
+            triggerExplosion(mx, my, (p1.radius + p2.radius) * 1.3, '#ffffff', true);
+            p1.destroy();
+            p2.destroy();
+          }
+        }
+      }
+
+      meteoroids.forEach(m => {
+        if (!m.active) return;
+        
+        if (m.isGiantComet && m.targetPlanet && m.targetPlanet.state === 'normal') {
+          const dist = Math.hypot(m.x - m.targetPlanet.x, m.y - m.targetPlanet.y);
+          if (dist < m.targetPlanet.radius + 15) {
+            triggerExplosion(m.targetPlanet.x, m.targetPlanet.y, m.targetPlanet.radius * 1.4, m.targetPlanet.getColor(), true);
+            m.targetPlanet.destroy();
+            m.active = false;
+          }
+        } else {
+          planets.forEach(p => {
+            if (p.state !== 'normal') return;
+            const dist = Math.hypot(m.x - p.x, m.y - p.y);
+            if (dist < p.radius + 12) {
+              m.active = false;
+              if (m.isPlayerSpawned) {
+                triggerExplosion(p.x, p.y, p.radius * 1.2, p.getColor(), true);
+              } else {
+                triggerExplosion(p.x, p.y, p.radius, p.getColor(), false);
+              }
+              p.destroy();
+            }
+          });
+        }
+      });
+
       ctx.restore();
 
       requestAnimationFrame(animate);
@@ -1143,3 +1579,56 @@ revealTargets.forEach(el => scrollRevealObserver.observe(el));
   }
   requestAnimationFrame(animate);
 })();
+
+// ============================================
+// ACTIVE SECTION NAV LINK OBSERVER & SWEEPS
+// ============================================
+(function() {
+  const sections = document.querySelectorAll('header.hero, section.section');
+  const navLinks = document.querySelectorAll('.nav-links a');
+
+  // 1. Observer for Active Nav link highlight
+  const navObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.getAttribute('id');
+        navLinks.forEach(link => {
+          if (link.getAttribute('href') === `#${id}`) {
+            link.classList.add('active');
+          } else {
+            link.classList.remove('active');
+          }
+        });
+      }
+    });
+  }, { threshold: 0.2, rootMargin: "-25% 0px -55% 0px" });
+
+  sections.forEach(sec => navObserver.observe(sec));
+
+  // 2. Observer for Holographic Sweep Scanlines
+  const sweepObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('active-sweep');
+        sweepObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.08 });
+
+  document.querySelectorAll('section.section').forEach(sec => sweepObserver.observe(sec));
+
+  // 3. Dispatch warp speed event when clicking links or logo
+  navLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      window.dispatchEvent(new Event('triggerWarpSpeed'));
+    });
+  });
+
+  const navLogo = document.querySelector('.nav-logo');
+  if (navLogo) {
+    navLogo.addEventListener('click', () => {
+      window.dispatchEvent(new Event('triggerWarpSpeed'));
+    });
+  }
+})();
+
